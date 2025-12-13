@@ -1,0 +1,44 @@
+/* src/assets/styles/layout.css - 响应式布局 */
+.container {
+  width: 100%;
+  max-width: 100%;
+  padding: 0 16px;
+  margin: 0 auto;
+}
+
+/* 移动端优先，然后逐步增强 */
+@media (min-width: 480px) {
+  .container {
+    max-width: 480px;
+  }
+}
+
+@media (min-width: 768px) {
+  .container {
+    max-width: 768px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container {
+    max-width: 1024px;
+  }
+}
+
+/* 移动端适配 */
+@media (max-width: 480px) {
+  html {
+    font-size: 14px; /* 在小屏幕上缩小基础字体 */
+  }
+  
+  .mobile-padding {
+    padding: 12px;
+  }
+}
+
+/* 横屏适配 */
+@media (orientation: landscape) and (max-height: 480px) {
+  .container {
+    padding: 8px;
+  }
+}

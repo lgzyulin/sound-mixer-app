@@ -1,0 +1,23 @@
+/* src/assets/styles/variables.css - 定义治愈风CSS变量 */
+:root {
+  /* 柔和的自然色调 */
+  --color-primary: #88c0d0;     /* 天空蓝 */
+  --color-secondary: #a3be8c;   /* 苔藓绿 */
+  --color-accent: #b48ead;      /* 淡紫色 */
+  --color-bg: #f8f5f2;          /* 米白背景 */
+  --color-card: #ffffff;        /* 卡片白色 */
+  --color-text: #4c566a;        /* 柔和灰蓝色文字 */
+  --color-text-light: #81a1c1;  /* 浅色文字 */
+  
+  /* 圆角和阴影 */
+  --radius-small: 8px;
+  --radius-medium: 16px;
+  --radius-large: 24px;
+  --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.08);
+  --shadow-hard: 0 8px 30px rgba(0, 0, 0, 0.12);
+  
+  /* 响应式断点 */
+  --mobile: 480px;
+  --tablet: 768px;
+  --desktop: 1024px;
+}
