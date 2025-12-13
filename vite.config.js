@@ -10,7 +10,7 @@ export default defineConfig({
 
   // 插件配置：Vue 插件是必须的
   plugins: [vue()],
-
+  base: './',  // 这行很重要！
   // 模块解析配置
   resolve: {
     // 路径别名：非常重要，让导入文件更简洁
