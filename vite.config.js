@@ -2,14 +2,49 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import path from 'path' // 用于解析路径
-
+import { VitePWA } from 'vite-plugin-pwa'
 // https://vitejs.dev/config/
 export default defineConfig({
   // 指定项目根目录（默认为当前目录，通常不需更改）
   // root: process.cwd(), [3](@ref)
 
   // 插件配置：Vue 插件是必须的
-  plugins: [vue()],
+  plugins: [vue(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
+      manifest: {
+        name: '宁静之声 - 白噪声专注应用',
+        short_name: '宁静之声',
+        description: '专业的白噪声混合器和专注计时器',
+        theme_color: '#88c0d0',
+        background_color: '#f8f5f2',
+        display: 'standalone',
+        start_url: '/',
+        icons: [
+          {
+            src: '/pwa-192x192.png',
+            sizes: '192x192',
+            type: 'image/png'
+          },
+          {
+            src: '/pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png'
+          },
+          {
+            src: '/pwa-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any maskable'
+          }
+        ]
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}']
+      }
+    })
+  ],
   base: './',  // 这行很重要！
   // 模块解析配置
   resolve: {

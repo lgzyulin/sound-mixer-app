@@ -12,6 +12,14 @@
     <!-- 主内容 -->
     <main class="app-main">
       <div class="container">
+
+      
+        <!-- 专注计时器部分 -->
+        <section class="focus-section">
+          <h2>⏰ 专注计时器</h2>
+          <FocusTimer />
+        </section>
+        
         <!-- 全局音量控制 -->
         <section class="global-volume">
           <div class="section-header">
@@ -22,6 +30,7 @@
           </div>
           <SoundSlider v-model="globalVolume" />
         </section>
+
 
         <!-- 声音列表 -->
         <section class="sounds-section">
