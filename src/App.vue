@@ -1,8 +1,9 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useSoundMixer } from './composables/useSoundMixer'
+import { useTimer } from './composables/useTimer'
 import SoundCard from './components/SoundCard.vue'
-import LoadingSpinner from './components/LoadingSpinner.vue'
+import TimerRing from './components/TimerRing.vue'
 
 // 初始化音频管理器
 const {
@@ -11,98 +12,131 @@ const {
   globalVolume,
   isLoading,
   error,
-  loadProgress,
   loadedSoundsCount,
   toggleSound,
   setVolume,
   toggleAllSounds,
   preloadSounds,
-  loadTestAudio,
+  playAll,
+  pauseAll,
   cleanup
 } = useSoundMixer()
 
-// 加载状态
-const isInitializing = ref(true)
-const loadTimeoutRef = ref(null)
+// 初始化计时器
+const {
+  timerMode,
+  timerDuration,
+  timeLeft,
+  isTimerRunning,
+  progressPercentage,
+  strokeDashoffset,
+  circumference,
+  formattedTimeLeft,
+  formattedDuration,
+  setTimerDuration,
+  setTimerByPercentage,
+  setPresetTime,
+  startTimer,
+  pauseTimer,
+  stopTimer,
+  resetTimer,
+  toggleTimerMode,
+  toggleTimer
+} = useTimer()
 
-// 初始化加载
-const initializeApp = async () => {
-  console.log('应用初始化...')
-  isInitializing.value = true
-  
-  try {
-    // 先尝试加载一个测试音频
-    console.log('测试音频加载...')
-    const testLoaded = await loadTestAudio()
-    
-    if (!testLoaded) {
-      console.warn('测试音频加载失败，检查文件路径')
-      error.value = '音频文件可能不存在，请检查 public/sounds/ 目录'
-      return
+// 音频与计时器联动
+watch(isTimerRunning, (running) => {
+  if (running) {
+    // 计时器开始时，确保有至少一个音频在播放
+    if (!isPlaying.value) {
+      // 默认播放前两个音效
+      if (sounds.value.length >= 2) {
+        toggleSound(sounds.value[0].id)
+        toggleSound(sounds.value[1].id)
+      } else if (sounds.value.length > 0) {
+        toggleSound(sounds.value[0].id)
+      }
     }
+  } else {
+    // 计时器暂停时，不暂停音频，让用户自己控制
+  }
+})
+
+// 计时器结束事件
+if (typeof window !== 'undefined') {
+  window.addEventListener('timer-finished', () => {
+    // 计时结束时暂停所有音频
+    sounds.value.forEach(sound => {
+      if (sound.isActive) {
+        toggleSound(sound.id)
+      }
+    })
     
-    // 如果测试成功，加载所有音频
-    console.log('开始加载所有音频...')
-    await preloadSounds()
-    
-  } catch (err) {
-    console.error('应用初始化失败:', err)
-    error.value = `初始化失败: ${err.message}`
-  } finally {
-    isInitializing.value = false
-    console.log('应用初始化完成')
+    // 可以添加通知
+    if (Notification.permission === 'granted') {
+      new Notification('番茄计时器', {
+        body: '计时结束！',
+        icon: '/favicon.ico'
+      })
+    }
+  })
+}
+
+// 处理计时器模式切换
+const handleModeChange = (mode) => {
+  if (timerMode.value !== mode) {
+    toggleTimerMode()
   }
 }
 
-// 设置加载超时
-const setupLoadTimeout = () => {
-  clearTimeout(loadTimeoutRef.value)
-  loadTimeoutRef.value = setTimeout(() => {
-    if (isLoading.value) {
-      console.warn('音频加载超时')
-      error.value = '音频加载超时，请检查网络连接或刷新页面'
-      isLoading.value = false
-    }
-  }, 15000) // 15秒超时
+// 处理预设时间
+const handlePresetTime = (minutes) => {
+  setPresetTime(minutes)
+  if (isTimerRunning.value) {
+    stopTimer()
+  }
+}
+
+// 处理圆环拖动
+const handleTimeChange = (percentage) => {
+  setTimerByPercentage(percentage)
+  if (isTimerRunning.value) {
+    stopTimer()
+  }
+}
+
+// 初始化应用
+const initializeApp = async () => {
+  try {
+    await preloadSounds()
+  } catch (err) {
+    console.error('音频加载失败:', err)
+  }
 }
 
 // 组件挂载
 onMounted(async () => {
-  console.log('App.vue 挂载')
-  setupLoadTimeout()
   await initializeApp()
+  
+  // 请求通知权限
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission()
+  }
 })
 
 // 组件卸载
 onUnmounted(() => {
-  console.log('App.vue 卸载')
-  clearTimeout(loadTimeoutRef.value)
   cleanup()
-})
-
-// 监听错误状态
-watch(error, (newError) => {
-  if (newError) {
-    console.error('应用错误:', newError)
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('timer-finished', () => {})
   }
 })
-
-// 监听加载状态
-watch(isLoading, (loading) => {
-  console.log('加载状态:', loading ? '加载中' : '加载完成')
-})
-
-// 手动重试加载
-const retryLoad = async () => {
-  error.value = null
-  await initializeApp()
-}
 </script>
 
 <template>
   <div class="app">
-    <!-- 初始化加载 -->
-    <div v-if="isInitializing" class="loading-container">
+    <!-- 加载状态 -->
+    <div v-if="isLoading" class="loading-container">
       <div class="loading-animation">
         <div class="loading-dots">
           <div class="dot" style="--delay: 0s; --color: #4facfe"></div>
@@ -111,12 +145,9 @@ const retryLoad = async () => {
           <div class="dot" style="--delay: 0.3s; --color: #764ba2"></div>
         </div>
         <p class="loading-text">正在加载音频...</p>
-        <p class="loading-subtext">初始化应用程序</p>
+        <p class="loading-subtext">已加载 {{ loadedSoundsCount }}/6 个音频</p>
       </div>
     </div>
-
-    <!-- 音频加载中 -->
-    <LoadingSpinner v-else-if="isLoading" :progress="loadProgress" />
 
     <!-- 错误提示 -->
     <div v-else-if="error" class="error-container">
@@ -124,70 +155,108 @@ const retryLoad = async () => {
         <div class="error-icon">⚠️</div>
         <h3>加载失败</h3>
         <p class="error-message">{{ error }}</p>
-        <div class="error-details">
-          <p>已加载音频: {{ loadedSoundsCount }} / {{ sounds.length }}</p>
-          <p>请检查以下事项：</p>
-          <ul>
-            <li>public/sounds/ 目录下是否有音频文件</li>
-            <li>音频文件名是否正确（rain.mp3, waves.mp3等）</li>
-            <li>控制台是否有错误信息</li>
-          </ul>
-        </div>
-        <button class="retry-btn" @click="retryLoad">🔄 重新加载</button>
-        <button class="skip-btn" @click="isLoading = false; error = null">
-          ⏭️ 跳过音频加载
-        </button>
+        <button class="retry-btn" @click="initializeApp">🔄 重新加载</button>
       </div>
     </div>
 
     <!-- 主界面 -->
     <div v-else class="sound-mixer">
       <header class="app-header">
-        <h1>宁静之声 - 专业的白噪声混合器</h1>
-        <p class="app-subtitle">放松、专注、助眠</p>
+        <h1>宁静之声 - 专业的白噪音混合器</h1>
+        <p class="app-subtitle">放松、专注、助眠 | 番茄计时器专注工作法</p>
         
-        <div class="global-controls">
-          <button 
-            class="play-all-btn"
-            :class="{ active: isPlaying }"
-            @click="toggleAllSounds"
-          >
-            {{ isPlaying ? '⏸️ 暂停所有' : '▶️ 播放所有' }}
-          </button>
-          
-          <div class="volume-control">
-            <span>🔈 全局音量</span>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.01"
-              :value="globalVolume"
-              @input="setVolume({ volume: parseFloat($event.target.value) })"
-              class="volume-slider"
-            />
-            <span class="volume-value">{{ Math.round(globalVolume * 100) }}%</span>
-          </div>
-        </div>
-        
-        <div class="audio-info">
-          <span>已加载: {{ loadedSoundsCount }}/{{ sounds.length }} 个音频</span>
-          <span v-if="error" class="warning">⚠️ 部分音频加载失败</span>
+        <!-- 计时器状态 -->
+        <div class="timer-status">
+          <span class="timer-mode-badge" :class="timerMode">
+            {{ timerMode === 'infinite' ? '无限循环模式' : '倒计时模式' }}
+          </span>
+          <span v-if="timerMode === 'countdown'" class="timer-duration">
+            设定: {{ formattedDuration }}
+          </span>
         </div>
       </header>
 
-      <main class="sound-grid">
-        <SoundCard
-          v-for="sound in sounds"
-          :key="sound.id"
-          :sound="sound"
-          @toggle="toggleSound"
-          @volume-change="setVolume"
-        />
+      <main class="main-content">
+        <!-- 左侧 - 计时器控制 -->
+        <div class="timer-section">
+          <TimerRing
+            :timer-mode="timerMode"
+            :progress-percentage="progressPercentage"
+            :formatted-time-left="formattedTimeLeft"
+            :timer-duration="timerDuration"
+            :is-timer-running="isTimerRunning"
+            :circumference="circumference"
+            :stroke-dashoffset="strokeDashoffset"
+            @time-change="handleTimeChange"
+            @toggle="toggleTimer"
+            @stop="stopTimer"
+            @preset="handlePresetTime"
+            @mode-change="handleModeChange"
+          />
+          
+          <!-- 计时器说明 -->
+          <div class="timer-instructions">
+            <h3>使用方法：</h3>
+            <ul>
+              <li><strong>无限循环模式</strong>：音频持续播放直到手动停止</li>
+              <li><strong>倒计时模式</strong>：拖动圆环设置时间，最长2小时</li>
+              <li>点击预设时间快速设置常用时长</li>
+              <li>计时结束后音频会自动停止</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 右侧 - 音频控制 -->
+        <div class="audio-section">
+          <!-- 全局控制 -->
+          <div class="global-controls">
+            <button 
+              class="play-all-btn"
+              :class="{ active: isPlaying }"
+              @click="toggleAllSounds"
+            >
+              {{ isPlaying ? '⏸️ 暂停所有' : '▶️ 播放所有' }}
+            </button>
+            
+            <div class="volume-control">
+              <span>🔈 全局音量</span>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                :value="globalVolume"
+                @input="setVolume({ volume: parseFloat($event.target.value) })"
+                class="volume-slider"
+              />
+              <span class="volume-value">{{ Math.round(globalVolume * 100) }}%</span>
+            </div>
+          </div>
+          
+          <!-- 音频信息 -->
+          <div class="audio-info">
+            <span>已加载音频: {{ loadedSoundsCount }}/6</span>
+            <span v-if="timerMode === 'countdown'" class="timer-info">
+              计时器: {{ isTimerRunning ? '运行中' : '已暂停' }} - {{ formattedTimeLeft }}
+            </span>
+          </div>
+
+          <!-- 音效网格 -->
+          <div class="sound-grid">
+            <SoundCard
+              v-for="sound in sounds"
+              :key="sound.id"
+              :sound="sound"
+              @toggle="toggleSound"
+              @volume-change="setVolume"
+            />
+          </div>
+        </div>
       </main>
 
       <footer class="app-footer">
-        <p>使用空格键控制播放/暂停 | 使用方向键调整音量</p>
+        <p>🎯 使用番茄工作法提高专注力 | 推荐设置25分钟工作 + 5分钟休息</p>
+        <p class="footer-hint">提示：计时器运行时，音频会自动在计时结束时停止</p>
       </footer>
     </div>
   </div>
@@ -201,7 +270,7 @@ const retryLoad = async () => {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
 }
 
-/* 初始化加载样式 */
+/* 加载状态 */
 .loading-container {
   display: flex;
   justify-content: center;
@@ -258,7 +327,7 @@ const retryLoad = async () => {
   color: rgba(255, 255, 255, 0.7);
 }
 
-/* 错误提示样式 */
+/* 错误提示 */
 .error-container {
   display: flex;
   justify-content: center;
@@ -297,29 +366,10 @@ const retryLoad = async () => {
   font-size: 1rem;
 }
 
-.error-details {
-  text-align: left;
-  margin: 20px 0;
-  padding: 20px;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 10px;
-  font-size: 0.9rem;
-  line-height: 1.6;
-}
-
-.error-details ul {
-  margin: 10px 0 0 20px;
-  padding: 0;
-}
-
-.error-details li {
-  margin-bottom: 8px;
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.retry-btn, .skip-btn {
-  margin: 10px;
+.retry-btn {
   padding: 12px 24px;
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  color: white;
   border: none;
   border-radius: 25px;
   font-size: 1rem;
@@ -329,33 +379,22 @@ const retryLoad = async () => {
   min-width: 150px;
 }
 
-.retry-btn {
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-  color: white;
-}
-
-.skip-btn {
-  background: rgba(255, 255, 255, 0.1);
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-.retry-btn:hover, .skip-btn:hover {
+.retry-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
 }
 
-/* 主界面样式 */
+/* 主界面 */
 .sound-mixer {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 20px;
 }
 
 .app-header {
   text-align: center;
-  margin-bottom: 40px;
-  padding: 30px 20px;
+  margin-bottom: 30px;
+  padding: 20px;
   background: rgba(255, 255, 255, 0.05);
   border-radius: 20px;
   backdrop-filter: blur(10px);
@@ -375,16 +414,107 @@ const retryLoad = async () => {
 .app-subtitle {
   font-size: 1.1rem;
   opacity: 0.8;
-  margin-bottom: 30px;
+  margin-bottom: 15px;
   color: rgba(255, 255, 255, 0.7);
 }
 
+.timer-status {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 10px;
+}
+
+.timer-mode-badge {
+  padding: 6px 12px;
+  border-radius: 15px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  background: rgba(33, 150, 243, 0.2);
+  border: 1px solid #2196F3;
+  color: #90CAF9;
+}
+
+.timer-mode-badge.countdown {
+  background: rgba(76, 175, 80, 0.2);
+  border: 1px solid #4CAF50;
+  color: #A5D6A7;
+}
+
+.timer-duration {
+  padding: 6px 12px;
+  background: rgba(255, 193, 7, 0.2);
+  border: 1px solid #FFC107;
+  border-radius: 15px;
+  font-size: 0.9rem;
+  color: #FFE082;
+}
+
+/* 主内容区 */
+.main-content {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 30px;
+  margin-bottom: 30px;
+}
+
+.timer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.timer-instructions {
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.timer-instructions h3 {
+  margin-bottom: 10px;
+  color: #4facfe;
+  font-size: 1.2rem;
+}
+
+.timer-instructions ul {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
+}
+
+.timer-instructions li {
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.8);
+  padding-left: 20px;
+  position: relative;
+}
+
+.timer-instructions li:before {
+  content: '•';
+  color: #4facfe;
+  position: absolute;
+  left: 0;
+}
+
+.audio-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* 全局控制 */
 .global-controls {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 20px;
-  margin-bottom: 20px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 20px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .play-all-btn {
@@ -401,7 +531,8 @@ const retryLoad = async () => {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  min-width: 180px;
+  width: fit-content;
+  align-self: center;
 }
 
 .play-all-btn:hover {
@@ -420,7 +551,6 @@ const retryLoad = async () => {
   background: rgba(255, 255, 255, 0.1);
   padding: 10px 20px;
   border-radius: 20px;
-  min-width: 300px;
 }
 
 .volume-slider {
@@ -452,56 +582,103 @@ const retryLoad = async () => {
 }
 
 .audio-info {
-  margin-top: 20px;
-  font-size: 0.9rem;
-  opacity: 0.7;
   display: flex;
-  justify-content: center;
-  gap: 20px;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 15px;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
 }
 
-.warning {
-  color: #ffcc00;
+.timer-info {
+  background: rgba(76, 175, 80, 0.2);
+  padding: 6px 12px;
+  border-radius: 15px;
+  color: #A5D6A7;
+  border: 1px solid rgba(76, 175, 80, 0.3);
 }
 
+/* 音效网格 */
 .sound-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 20px;
-  margin-bottom: 40px;
 }
 
+/* 页脚 */
 .app-footer {
   text-align: center;
   padding: 20px;
+  margin-top: 30px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 20px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   font-size: 0.9rem;
-  opacity: 0.6;
   color: rgba(255, 255, 255, 0.6);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.app-footer p {
+  margin-bottom: 10px;
+}
+
+.footer-hint {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
 }
 
 /* 响应式设计 */
+@media (max-width: 1024px) {
+  .main-content {
+    grid-template-columns: 1fr;
+  }
+  
+  .timer-section {
+    order: 2;
+  }
+  
+  .audio-section {
+    order: 1;
+  }
+}
+
 @media (max-width: 768px) {
+  .app {
+    padding: 10px;
+  }
+  
   .app-header h1 {
     font-size: 2rem;
   }
   
-  .global-controls {
-    width: 100%;
-  }
-  
-  .volume-control {
-    min-width: auto;
-    width: 100%;
+  .main-content {
+    gap: 20px;
   }
   
   .sound-grid {
     grid-template-columns: 1fr;
   }
   
-  .error-content {
-    padding: 20px;
-    margin: 20px;
+  .global-controls {
+    padding: 15px;
+  }
+  
+  .play-all-btn {
+    width: 100%;
+  }
+  
+  .volume-control {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .audio-info {
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
   }
 }
 </style>

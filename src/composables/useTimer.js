@@ -1,115 +1,159 @@
-import { ref, computed, watch } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 
-export function useTimer(audioManager) {
+export function useTimer() {
   // 计时器状态
-  const timerMode = ref(false) // false: 无限循环, true: 倒计时
-  const timerDuration = ref(0) // 总时长（秒）
-  const timeLeft = ref(0) // 剩余时间（秒）
+  const timerMode = ref('infinite') // 'infinite' 或 'countdown'
+  const timerDuration = ref(1500) // 默认25分钟（1500秒）
+  const timeLeft = ref(1500)
   const isTimerRunning = ref(false)
   const timerInterval = ref(null)
-
+  
   // 圆环进度条计算
-  const circumference = 2 * Math.PI * 45 // 圆环周长
+  const circumference = 2 * Math.PI * 45
   const progressPercentage = computed(() => {
-    if (!timerMode.value || timerDuration.value === 0) return 100
+    if (timerMode.value === 'infinite') return 100
     return (timeLeft.value / timerDuration.value) * 100
   })
   
   const strokeDashoffset = computed(() => {
     return circumference - (progressPercentage.value / 100) * circumference
   })
-
-  // 格式化时间显示 (HH:MM:SS)
+  
+  // 格式化时间显示
   const formattedTimeLeft = computed(() => {
-    const hours = Math.floor(timeLeft.value / 3600)
-    const minutes = Math.floor((timeLeft.value % 3600) / 60)
-    const seconds = Math.floor(timeLeft.value % 60)
+    const totalSeconds = Math.floor(timeLeft.value)
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    const seconds = totalSeconds % 60
     
     if (hours > 0) {
-      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
     }
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
   })
-
-  // 设置倒计时时间（通过圆环拖动）
-  const setTimerDuration = (hours, minutes, seconds) => {
-    const totalSeconds = hours * 3600 + minutes * 60 + seconds
-    timerDuration.value = Math.min(totalSeconds, 7200) // 限制2小时
-    timeLeft.value = timerDuration.value
+  
+  // 格式化总时长显示
+  const formattedDuration = computed(() => {
+    const totalSeconds = timerDuration.value
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    const seconds = totalSeconds % 60
+    
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+    }
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+  })
+  
+  // 设置倒计时时间
+  const setTimerDuration = (seconds) => {
+    if (seconds < 60) seconds = 60 // 最少1分钟
+    if (seconds > 7200) seconds = 7200 // 最多2小时
+    timerDuration.value = seconds
+    timeLeft.value = seconds
   }
-
-  // 通过圆环进度设置时间（百分比）
+  
+  // 通过圆环进度设置时间
   const setTimerByPercentage = (percentage) => {
-    const totalSeconds = Math.floor((percentage / 100) * 7200) // 7200秒=2小时
-    timerDuration.value = totalSeconds
-    timeLeft.value = totalSeconds
+    const totalSeconds = Math.floor((percentage / 100) * 7200)
+    setTimerDuration(totalSeconds)
   }
-
+  
+  // 设置预设时间
+  const setPresetTime = (minutes) => {
+    setTimerDuration(minutes * 60)
+  }
+  
   // 启动计时器
   const startTimer = () => {
-    if (timerMode.value && timeLeft.value <= 0) return
+    if (timeLeft.value <= 0) {
+      resetTimer()
+    }
     
     isTimerRunning.value = true
     
-    if (timerMode.value) {
-      // 倒计时模式
-      timerInterval.value = setInterval(() => {
-        timeLeft.value--
-        
+    timerInterval.value = setInterval(() => {
+      if (timerMode.value === 'countdown') {
         if (timeLeft.value <= 0) {
           stopTimer()
-          // 可以添加计时结束的回调
-          console.log('计时结束')
+          // 触发计时结束事件
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('timer-finished'))
+          }
+          return
         }
-      }, 1000)
-    }
-    
-    // 启动音频播放
-    audioManager.playAll()
+        timeLeft.value--
+      }
+      // 无限循环模式下不需要减少时间
+    }, 1000)
   }
-
+  
   // 暂停计时器
   const pauseTimer = () => {
     isTimerRunning.value = false
-    clearInterval(timerInterval.value)
-    audioManager.pauseAll()
+    if (timerInterval.value) {
+      clearInterval(timerInterval.value)
+      timerInterval.value = null
+    }
   }
-
+  
   // 停止计时器
   const stopTimer = () => {
-    isTimerRunning.value = false
-    clearInterval(timerInterval.value)
+    pauseTimer()
     timeLeft.value = timerDuration.value
-    audioManager.pauseAll()
   }
-
-  // 切换计时模式
-  const toggleTimerMode = () => {
-    timerMode.value = !timerMode.value
-    stopTimer() // 切换模式时重置状态
-  }
-
+  
   // 重置计时器
   const resetTimer = () => {
     stopTimer()
     timeLeft.value = timerDuration.value
   }
-
+  
+  // 切换计时模式
+  const toggleTimerMode = () => {
+    timerMode.value = timerMode.value === 'infinite' ? 'countdown' : 'infinite'
+    resetTimer()
+  }
+  
+  // 切换计时器运行状态
+  const toggleTimer = () => {
+    if (isTimerRunning.value) {
+      pauseTimer()
+    } else {
+      startTimer()
+    }
+  }
+  
+  // 清理资源
+  onUnmounted(() => {
+    if (timerInterval.value) {
+      clearInterval(timerInterval.value)
+    }
+  })
+  
   return {
+    // 状态
     timerMode,
     timerDuration,
     timeLeft,
     isTimerRunning,
+    
+    // 计算属性
     progressPercentage,
     strokeDashoffset,
     circumference,
     formattedTimeLeft,
+    formattedDuration,
+    
+    // 方法
     setTimerDuration,
     setTimerByPercentage,
+    setPresetTime,
     startTimer,
     pauseTimer,
     stopTimer,
+    resetTimer,
     toggleTimerMode,
-    resetTimer
+    toggleTimer
   }
 }
