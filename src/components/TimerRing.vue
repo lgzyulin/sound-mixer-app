@@ -2,12 +2,11 @@
   <div class="timer-ring-container">
     <div class="timer-display">
       <svg 
+        ref="svgElement"
         width="200" 
         height="200" 
         viewBox="0 0 100 100"
         class="ring-svg"
-        @mousedown="startDrag"
-        @touchstart="startDrag"
       >
         <!-- 背景圆环 -->
         <circle
@@ -63,8 +62,8 @@
         v-if="timerMode === 'countdown'"
         class="drag-handle"
         :style="handleStyle"
-        @mousedown.stop="startDrag"
-        @touchstart.stop="startDrag"
+        @mousedown="startDrag"
+        @touchstart="startDrag"
       >
         <div class="handle-dot"></div>
       </div>
@@ -72,23 +71,39 @@
     
     <!-- 控制按钮 -->
     <div class="timer-controls">
-      <button 
-        class="timer-btn play-pause-btn"
-        :class="{ paused: !isTimerRunning }"
-        @click="$emit('toggle')"
-      >
-        {{ isTimerRunning ? '⏸️' : '▶️' }}
-      </button>
+      <!-- 无限循环模式：显示播放/暂停按钮（控制所有音频） -->
+      <template v-if="timerMode === 'infinite'">
+        <button 
+          class="timer-btn infinite-play-btn"
+          :class="{ paused: !isPlayingAll }"
+          @click="$emit('toggle-all')"
+        >
+          {{ isPlayingAll ? '⏸️ 暂停' : '▶️ 播放' }}
+        </button>
+      </template>
       
-      <button 
-        class="timer-btn stop-btn"
-        @click="$emit('stop')"
-      >
-        ⏹️
-      </button>
+      <!-- 倒计时模式：显示计时器控制按钮 -->
+      <template v-else>
+        <div class="countdown-controls">
+          <button 
+            class="timer-btn play-pause-btn"
+            :class="{ paused: !isTimerRunning }"
+            @click="$emit('toggle')"
+          >
+            {{ isTimerRunning ? '⏸️ 暂停' : '▶️ 开始' }}
+          </button>
+          
+          <button 
+            class="timer-btn stop-btn"
+            @click="$emit('stop')"
+          >
+            ⏹️ 停止
+          </button>
+        </div>
+      </template>
     </div>
     
-    <!-- 预设时间 -->
+    <!-- 预设时间（只在倒计时模式下显示） -->
     <div v-if="timerMode === 'countdown'" class="preset-times">
       <button 
         v-for="preset in presets" 
@@ -122,7 +137,7 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 
 const props = defineProps({
   timerMode: {
@@ -146,9 +161,13 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  isPlayingAll: {
+    type: Boolean,
+    default: false
+  },
   circumference: {
     type: Number,
-    default: 282.743
+    default: 282.743 // 2 * π * 45
   },
   strokeDashoffset: {
     type: Number,
@@ -156,7 +175,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['time-change', 'toggle', 'stop', 'preset', 'mode-change'])
+const emit = defineEmits(['time-change', 'toggle', 'stop', 'preset', 'mode-change', 'toggle-all'])
 
 // 预设时间
 const presets = [
@@ -166,6 +185,10 @@ const presets = [
   { minutes: 25, label: '25分钟' },
   { minutes: 30, label: '30分钟' }
 ]
+
+// 元素引用
+const svgElement = ref(null)
+const timerDisplay = ref(null)
 
 // 计算属性
 const progressColor = computed(() => {
@@ -186,17 +209,26 @@ const modeText = computed(() => {
   return props.timerMode === 'infinite' ? '无限循环' : '倒计时'
 })
 
+// 修正拖动点位置计算
 const handleStyle = computed(() => {
   if (props.timerMode === 'infinite') return {}
   
   const percentage = Math.max(0, Math.min(100, props.progressPercentage))
-  const angle = (percentage / 100) * 2 * Math.PI - Math.PI / 2
-  const x = 50 + 45 * Math.cos(angle)
-  const y = 50 + 45 * Math.sin(angle)
+  // 计算角度：0% = 270度（顶部），100% = 630度（同样顶部，一圈后）
+  const angle = (percentage / 100) * 360 - 90 // 调整为从顶部开始
   
+  // 转换为弧度
+  const radians = (angle * Math.PI) / 180
+  
+  // SVG坐标系：中心点(50, 50)，半径45
+  const x = 50 + 45 * Math.cos(radians)
+  const y = 50 + 45 * Math.sin(radians)
+  
+  // 转换为百分比定位
   return {
-    left: `calc(${x}% - 12px)`,
-    top: `calc(${y}% - 12px)`
+    left: `${x}%`,
+    top: `${y}%`,
+    transform: 'translate(-50%, -50%)' // 让拖动点居中
   }
 })
 
@@ -232,28 +264,47 @@ const startDrag = (event) => {
   document.addEventListener('touchmove', handleMove, { passive: false })
   document.addEventListener('mouseup', handleEnd)
   document.addEventListener('touchend', handleEnd)
+  
+  // 立即更新一次（用于处理点击事件）
+  const clientX = event.clientX || (event.touches && event.touches[0].clientX)
+  const clientY = event.clientY || (event.touches && event.touches[0].clientY)
+  
+  if (clientX && clientY) {
+    updateTime(clientX, clientY)
+  }
 }
 
 const updateTime = (clientX, clientY) => {
-  const svg = document.querySelector('.ring-svg')
-  if (!svg) return
+  if (!svgElement.value) return
   
-  const rect = svg.getBoundingClientRect()
+  const rect = svgElement.value.getBoundingClientRect()
   const centerX = rect.left + rect.width / 2
   const centerY = rect.top + rect.height / 2
+  
+  // 计算相对于中心的坐标
   const deltaX = clientX - centerX
   const deltaY = clientY - centerY
   
-  // 计算角度
-  let angle = Math.atan2(deltaY, deltaX)
-  // 转换为0-360度
-  if (angle < 0) angle += 2 * Math.PI
-  // 转换为0-100百分比
-  const percentage = (angle / (2 * Math.PI)) * 100
+  // 计算角度（以3点钟方向为0度）
+  let angle = Math.atan2(deltaY, deltaX) * 180 / Math.PI
   
+  // 转换为从顶部（12点钟方向）开始，顺时针增加
+  // 数学角度：0度=3点钟，90度=6点钟，180度=9点钟，270度=12点钟
+  // 我们想要：0度=12点钟，90度=3点钟，180度=6点钟，270度=9点钟
+  angle += 90 // 从3点钟方向调整到12点钟方向
+  
+  // 确保角度在0-360度之间
+  if (angle < 0) angle += 360
+  if (angle >= 360) angle -= 360
+  
+  // 转换为百分比：顶部（12点钟方向）= 0%，顺时针增加到360° = 100%
+  const percentage = angle / 360 * 100
+  
+  // 发出时间变化事件
   emit('time-change', Math.max(0, Math.min(100, percentage)))
 }
 
+// 生命周期钩子
 onMounted(() => {
   // 防止文本选择
   document.addEventListener('selectstart', preventSelect)
@@ -333,6 +384,11 @@ const preventSelect = (event) => {
   display: flex;
   align-items: center;
   justify-content: center;
+  pointer-events: auto;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
 }
 
 .handle-dot {
@@ -345,32 +401,66 @@ const preventSelect = (event) => {
   transition: all 0.2s ease;
 }
 
-.drag-handle:active {
-  cursor: grabbing;
-}
-
 .drag-handle:active .handle-dot {
   transform: scale(1.3);
   box-shadow: 0 0 12px rgba(76, 175, 80, 0.7);
 }
 
+/* 控制按钮区域 */
 .timer-controls {
   display: flex;
-  gap: 10px;
+  justify-content: center;
+  width: 100%;
   margin-top: 10px;
+}
+
+/* 无限循环模式按钮 */
+.infinite-play-btn {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+  color: white;
+  border: none;
+  border-radius: 25px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 120px;
+}
+
+.infinite-play-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(76, 175, 80, 0.4);
+}
+
+.infinite-play-btn.paused {
+  background: linear-gradient(135deg, #2196F3, #1976D2);
+}
+
+/* 倒计时模式按钮 */
+.countdown-controls {
+  display: flex;
+  gap: 10px;
+  width: 100%;
 }
 
 .timer-btn {
   padding: 10px 20px;
   border: none;
   border-radius: 25px;
-  font-size: 1.1rem;
+  font-size: 1rem;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 60px;
+  gap: 8px;
+  flex: 1;
 }
 
 .play-pause-btn {
@@ -392,11 +482,13 @@ const preventSelect = (event) => {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
+/* 预设时间 */
 .preset-times {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   justify-content: center;
+  width: 100%;
   margin-top: 10px;
 }
 
@@ -422,14 +514,17 @@ const preventSelect = (event) => {
   box-shadow: 0 0 8px rgba(33, 150, 243, 0.4);
 }
 
+/* 模式切换 */
 .mode-switch {
   display: flex;
   gap: 10px;
+  width: 100%;
   margin-top: 10px;
 }
 
 .mode-btn {
-  padding: 8px 16px;
+  flex: 1;
+  padding: 10px 15px;
   background: rgba(255, 255, 255, 0.1);
   color: white;
   border: 1px solid rgba(255, 255, 255, 0.3);
@@ -437,8 +532,10 @@ const preventSelect = (event) => {
   font-size: 0.9rem;
   cursor: pointer;
   transition: all 0.3s ease;
+  text-align: center;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
 }
 
@@ -453,7 +550,7 @@ const preventSelect = (event) => {
   box-shadow: 0 0 8px rgba(76, 175, 80, 0.3);
 }
 
-.mode-btn.infinite.active {
+.mode-btn.countdown.active {
   background: rgba(33, 150, 243, 0.3);
   border-color: #2196F3;
   box-shadow: 0 0 8px rgba(33, 150, 243, 0.3);
@@ -481,7 +578,11 @@ const preventSelect = (event) => {
   .timer-btn {
     padding: 8px 16px;
     font-size: 1rem;
-    min-width: 50px;
+  }
+  
+  .infinite-play-btn {
+    min-width: 100px;
+    padding: 10px 20px;
   }
   
   .preset-times {
@@ -494,7 +595,7 @@ const preventSelect = (event) => {
   }
   
   .mode-btn {
-    padding: 6px 12px;
+    padding: 8px 12px;
     font-size: 0.8rem;
   }
 }
