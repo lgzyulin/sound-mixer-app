@@ -1,4 +1,4 @@
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 // 音频配置
 const SOUND_CONFIG = [
@@ -6,35 +6,35 @@ const SOUND_CONFIG = [
     id: 'rain',
     name: '下雨声',
     icon: '🌧️',
-    file: '/sounds/rain.mp3',
+    file: '/sounds/1.mp3',
     color: '#4facfe'
   },
   {
     id: 'waves',
     name: '海浪声',
     icon: '🌊',
-    file: '/sounds/waves.mp3',
+    file: '/sounds/2.mp3',
     color: '#a8edea'
   },
   {
     id: 'fireplace',
     name: '火炉声',
     icon: '🔥',
-    file: '/sounds/fireplace.mp3',
+    file: '/sounds/3.mp3',
     color: '#ff9a9e'
   },
   {
     id: 'forest',
     name: '森林声',
     icon: '🌲',
-    file: '/sounds/forest.mp3',
+    file: '/sounds/birds.mp3',
     color: '#a3b18a'
   },
   {
     id: 'coffee',
     name: '咖啡厅',
     icon: '☕',
-    file: '/sounds/coffee.mp3',
+    file: '/sounds/storm.mp3',
     color: '#d4a574'
   },
   {
@@ -47,7 +47,6 @@ const SOUND_CONFIG = [
 ]
 
 export function useSoundMixer() {
-  // 状态管理
   const sounds = ref([])
   const isPlaying = ref(false)
   const globalVolume = ref(0.5)
@@ -61,7 +60,8 @@ export function useSoundMixer() {
       audio: null,
       volume: 0.5,
       isActive: false,
-      isLoading: false
+      isLoading: false,
+      displayName: sound.name // 使用音频本身名称
     }))
   }
 
@@ -77,16 +77,24 @@ export function useSoundMixer() {
           
           const audio = new Audio()
           audio.src = sound.file
-          audio.volume = sound.volume
-          audio.loop = true
+          audio.volume = sound.volume * globalVolume.value
+          audio.loop = true // 默认设置为循环
           audio.preload = 'auto'
 
-          // 等待音频可以播放
+          // 处理音频结束事件，实现无缝循环
+          audio.addEventListener('ended', () => {
+            if (sound.isActive) {
+              audio.currentTime = 0
+              audio.play().catch(err => {
+                console.error(`音频循环播放失败 (${sound.name}):`, err)
+              })
+            }
+          })
+
           await new Promise((resolve, reject) => {
             audio.addEventListener('canplaythrough', resolve, { once: true })
             audio.addEventListener('error', reject, { once: true })
             
-            // 设置超时时间
             const timeout = setTimeout(() => {
               reject(new Error(`音频加载超时: ${sound.name}`))
             }, 10000)
@@ -137,23 +145,21 @@ export function useSoundMixer() {
       })
     } else {
       sound.audio.pause()
+      sound.audio.currentTime = 0 // 重置播放位置
     }
 
-    // 更新全局播放状态
     updateGlobalPlayState()
   }
 
   // 设置音量
   const setVolume = ({ soundId, volume }) => {
     if (soundId) {
-      // 设置单个音效音量
       const sound = sounds.value.find(s => s.id === soundId)
       if (sound && sound.audio) {
         sound.volume = volume
         sound.audio.volume = volume * globalVolume.value
       }
     } else {
-      // 设置全局音量
       globalVolume.value = volume
       sounds.value.forEach(sound => {
         if (sound.audio && sound.isActive) {
@@ -163,25 +169,41 @@ export function useSoundMixer() {
     }
   }
 
+  // 播放所有音效
+  const playAll = () => {
+    sounds.value.forEach(sound => {
+      if (sound.audio && !sound.isActive) {
+        sound.isActive = true
+        sound.audio.volume = sound.volume * globalVolume.value
+        sound.audio.play().catch(err => {
+          console.error(`播放音频失败 (${sound.name}):`, err)
+          sound.isActive = false
+        })
+      }
+    })
+    updateGlobalPlayState()
+  }
+
+  // 暂停所有音效
+  const pauseAll = () => {
+    sounds.value.forEach(sound => {
+      if (sound.audio && sound.isActive) {
+        sound.isActive = false
+        sound.audio.pause()
+      }
+    })
+    updateGlobalPlayState()
+  }
+
   // 切换所有音效
   const toggleAllSounds = () => {
     isPlaying.value = !isPlaying.value
     
-    sounds.value.forEach(sound => {
-      if (sound.audio) {
-        if (isPlaying.value && !sound.isActive) {
-          sound.isActive = true
-          sound.audio.volume = sound.volume * globalVolume.value
-          sound.audio.play().catch(err => {
-            console.error(`播放音频失败 (${sound.name}):`, err)
-            sound.isActive = false
-          })
-        } else if (!isPlaying.value && sound.isActive) {
-          sound.isActive = false
-          sound.audio.pause()
-        }
-      }
-    })
+    if (isPlaying.value) {
+      playAll()
+    } else {
+      pauseAll()
+    }
   }
 
   // 更新全局播放状态
@@ -189,10 +211,27 @@ export function useSoundMixer() {
     isPlaying.value = sounds.value.some(sound => sound.isActive)
   }
 
-  // 计算属性：活跃的音效数量
-  const activeSoundsCount = computed(() => {
-    return sounds.value.filter(sound => sound.isActive).length
-  })
+  // 停止所有音效（完全停止）
+  const stopAll = () => {
+    sounds.value.forEach(sound => {
+      if (sound.audio) {
+        sound.isActive = false
+        sound.audio.pause()
+        sound.audio.currentTime = 0
+      }
+    })
+    updateGlobalPlayState()
+  }
+
+  // 清理资源
+  const cleanup = () => {
+    sounds.value.forEach(sound => {
+      if (sound.audio) {
+        sound.audio.pause()
+        sound.audio = null
+      }
+    })
+  }
 
   // 初始化
   initializeSounds()
@@ -203,10 +242,13 @@ export function useSoundMixer() {
     globalVolume,
     isLoading,
     error,
-    activeSoundsCount,
     toggleSound,
     setVolume,
     toggleAllSounds,
-    preloadSounds
+    playAll,
+    pauseAll,
+    stopAll,
+    preloadSounds,
+    cleanup
   }
 }
