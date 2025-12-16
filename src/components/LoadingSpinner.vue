@@ -1,19 +1,30 @@
 <template>
   <div class="loading-overlay">
-    <div class="loading-container">
+    <div class="loading-content">
       <div class="spinner">
         <div class="spinner-circle"></div>
-        <div class="spinner-circle"></div>
-        <div class="spinner-circle"></div>
-        <div class="spinner-circle"></div>
       </div>
-      <p class="loading-text">正在加载音频...</p>
+      <p class="loading-text">{{ message }}</p>
+      <p v-if="progress > 0" class="loading-progress">
+        加载中... {{ progress }}%
+      </p>
     </div>
   </div>
 </template>
 
 <script setup>
-// 这是一个加载动画组件
+import { defineProps } from 'vue'
+
+const props = defineProps({
+  message: {
+    type: String,
+    default: '正在加载音频...'
+  },
+  progress: {
+    type: Number,
+    default: 0
+  }
+})
 </script>
 
 <style scoped>
@@ -23,7 +34,7 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.8);
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -31,71 +42,55 @@
   backdrop-filter: blur(5px);
 }
 
-.loading-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
+.loading-content {
+  text-align: center;
+  padding: 40px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 20px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
 .spinner {
-  display: inline-block;
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 20px;
   position: relative;
-  width: 80px;
-  height: 80px;
 }
 
 .spinner-circle {
-  position: absolute;
-  width: 16px;
-  height: 16px;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
-  background: #4facfe;
-  animation: spinner 1.2s linear infinite;
+  border: 4px solid transparent;
+  border-top-color: #4facfe;
+  border-right-color: #00f2fe;
+  border-bottom-color: #667eea;
+  border-left-color: #764ba2;
+  animation: spin 1.5s linear infinite;
 }
 
-.spinner-circle:nth-child(1) {
-  top: 8px;
-  left: 8px;
-  animation-delay: 0s;
-  background: #4facfe;
-}
-
-.spinner-circle:nth-child(2) {
-  top: 8px;
-  right: 8px;
-  animation-delay: -0.4s;
-  background: #00f2fe;
-}
-
-.spinner-circle:nth-child(3) {
-  bottom: 8px;
-  right: 8px;
-  animation-delay: -0.8s;
-  background: #667eea;
-}
-
-.spinner-circle:nth-child(4) {
-  bottom: 8px;
-  left: 8px;
-  animation-delay: -1.2s;
-  background: #764ba2;
-}
-
-@keyframes spinner {
-  0%, 100% {
-    transform: scale(1);
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
   }
-  50% {
-    transform: scale(0.5);
+  100% {
+    transform: rotate(360deg);
   }
 }
 
 .loading-text {
   color: white;
   font-size: 1.2rem;
+  margin-bottom: 10px;
   font-weight: 300;
   letter-spacing: 1px;
+}
+
+.loading-progress {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.9rem;
   animation: pulse 1.5s ease-in-out infinite;
 }
 
