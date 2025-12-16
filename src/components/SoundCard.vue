@@ -1,229 +1,300 @@
-<!-- src/components/SoundCard.vue - 声音卡片组件 -->
 <template>
-  <div
-    :class="[
-      'sound-card',
-      { 'sound-card--active': isActive },
-      { 'sound-card--disabled': disabled }
-    ]"
-    @click="handleClick"
+  <div 
+    class="sound-card"
+    :class="{ 
+      'active': sound.isActive,
+      'loading': sound.isLoading 
+    }"
+    :style="{ 
+      '--card-color': sound.color || '#667eea',
+      'background': `linear-gradient(135deg, ${sound.color}20, transparent)`
+    }"
   >
-    <div class="sound-card__icon">
-      <div class="icon-wrapper">
-        <slot name="icon">
-          <div class="default-icon">{{ soundEmoji }}</div>
-        </slot>
+    <!-- 卡片头部 -->
+    <div class="card-header">
+      <div class="sound-icon">
+        {{ sound.icon }}
       </div>
+      <h3 class="sound-name">{{ sound.name }}</h3>
+      <div 
+        class="status-indicator"
+        :class="{ 'active': sound.isActive }"
+      ></div>
     </div>
-    
-    <div class="sound-card__content">
-      <div class="sound-card__header">
-        <h3 class="sound-card__title">{{ sound.name }}</h3>
-        <div class="sound-card__status">
-          <span v-if="isActive" class="status-indicator status-indicator--active"></span>
-          <span v-else class="status-indicator"></span>
-        </div>
+
+    <!-- 播放/暂停按钮 -->
+    <button 
+      class="play-button"
+      @click="toggleSound"
+      :disabled="sound.isLoading"
+    >
+      {{ sound.isActive ? '⏸️' : '▶️' }}
+    </button>
+
+    <!-- 音量控制 -->
+    <div class="volume-control">
+      <div class="volume-label">
+        <span>🔈 音量</span>
+        <span class="volume-percentage">
+          {{ Math.round(sound.volume * 100) }}%
+        </span>
       </div>
-      
-      <div class="sound-card__volume">
-        <SoundSlider
-          v-model="volume"
-          :disabled="disabled"
-          @update:modelValue="handleVolumeChange"
-        />
-      </div>
+      <input
+        type="range"
+        min="0"
+        max="1"
+        step="0.01"
+        :value="sound.volume"
+        @input="handleVolumeChange"
+        class="volume-slider"
+        :style="{
+          'background': `linear-gradient(90deg, ${sound.color} ${sound.volume * 100}%, #ddd ${sound.volume * 100}%)`
+        }"
+      />
     </div>
-    
-    <div class="sound-card__actions">
-      <BaseButton
-        :type="isActive ? 'primary' : 'outline'"
-        round
-        @click.stop="toggleSound"
-      >
-        {{ isActive ? '⏸️' : '▶️' }}
-      </BaseButton>
+
+    <!-- 加载状态 -->
+    <div v-if="sound.isLoading" class="loading-overlay">
+      <div class="loading-spinner"></div>
+      <span>加载中...</span>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import SoundSlider from './SoundSlider.vue'
-import BaseButton from './BaseButton.vue'
+import { defineProps, defineEmits } from 'vue'
 
 const props = defineProps({
   sound: {
     type: Object,
-    required: true,
-    default: () => ({
-      id: '',
-      name: '未知声音',
-      volume: 0.5,
-      isActive: false
-    })
-  },
-  disabled: {
-    type: Boolean,
-    default: false
+    required: true
   }
 })
 
 const emit = defineEmits(['toggle', 'volume-change'])
 
-const volume = ref(props.sound.volume)
-const isActive = ref(props.sound.isActive)
-
-const soundEmoji = computed(() => {
-  const emojiMap = {
-    '雨声': '🌧️',
-    '雷声': '⛈️',
-    '溪流': '🏞️',
-    '风声': '🌬️',
-    '篝火': '🔥',
-    '海浪': '🌊',
-    '森林': '🌲',
-    '咖啡厅': '☕',
-    '键盘声': '⌨️'
-  }
-  return emojiMap[props.sound.name] || '🎵'
-})
-
-const handleClick = () => {
-  if (props.disabled) return
-  toggleSound()
-}
-
 const toggleSound = () => {
-  isActive.value = !isActive.value
-  emit('toggle', props.sound.id, isActive.value)
+  emit('toggle', props.sound.id)
 }
 
-const handleVolumeChange = (newVolume) => {
-  volume.value = newVolume
-  emit('volume-change', props.sound.id, newVolume)
+const handleVolumeChange = (event) => {
+  emit('volume-change', { 
+    soundId: props.sound.id, 
+    volume: parseFloat(event.target.value) 
+  })
 }
 </script>
 
 <style scoped>
 .sound-card {
-  display: flex;
-  align-items: center;
-  gap: 16px;
+  position: relative;
   padding: 20px;
-  background: var(--color-card);
-  border-radius: var(--radius-large);
-  box-shadow: var(--shadow-soft);
-  transition: all 0.3s ease;
-  cursor: pointer;
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
   border: 2px solid transparent;
-  margin-bottom: 12px;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  cursor: pointer;
+  overflow: hidden;
 }
 
 .sound-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-hard);
-  border-color: rgba(136, 192, 208, 0.3);
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 
-.sound-card--active {
-  border-color: var(--color-primary);
-  background: linear-gradient(135deg, #f8f5f2, #ffffff);
+.sound-card.active {
+  border-color: var(--card-color);
+  box-shadow: 0 0 20px var(--card-color)40;
 }
 
-.sound-card--disabled {
-  opacity: 0.6;
+.sound-card.loading {
+  opacity: 0.7;
   cursor: not-allowed;
 }
 
-.sound-card--disabled:hover {
-  transform: none;
-  box-shadow: var(--shadow-soft);
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
-.sound-card__icon {
-  flex-shrink: 0;
-}
-
-.icon-wrapper {
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
+.sound-icon {
+  font-size: 2rem;
+  width: 50px;
+  height: 50px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  transition: transform 0.3s ease;
 }
 
-.default-icon {
-  font-size: 2rem;
+.sound-card:hover .sound-icon {
+  transform: scale(1.1);
 }
 
-.sound-card__content {
+.sound-name {
   flex: 1;
-  min-width: 0; /* 防止内容溢出 */
-}
-
-.sound-card__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.sound-card__title {
-  font-size: 1.1rem;
-  font-weight: 600;
-  color: var(--color-text);
   margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: white;
+  font-size: 1.2rem;
+  font-weight: 600;
+  text-align: left;
 }
 
 .status-indicator {
-  width: 8px;
-  height: 8px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background-color: #e5e9f0;
-  display: inline-block;
+  background: #ff4757;
+  transition: background-color 0.3s ease;
 }
 
-.status-indicator--active {
-  background-color: var(--color-secondary);
-  box-shadow: 0 0 8px var(--color-secondary);
-  animation: pulse 2s infinite;
+.status-indicator.active {
+  background: #2ed573;
+  box-shadow: 0 0 10px #2ed573;
 }
 
-@keyframes pulse {
-  0% { opacity: 1; }
-  50% { opacity: 0.5; }
-  100% { opacity: 1; }
+.play-button {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--card-color), #667eea);
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  align-self: center;
+  margin: 10px 0;
 }
 
-.sound-card__volume {
+.play-button:hover:not(:disabled) {
+  transform: scale(1.1);
+  box-shadow: 0 0 20px var(--card-color);
+}
+
+.play-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.volume-control {
   width: 100%;
 }
 
-.sound-card__actions {
-  flex-shrink: 0;
+.volume-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  color: white;
+  font-size: 0.9rem;
 }
 
-/* 移动端适配 */
-@media (max-width: 480px) {
+.volume-percentage {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.8rem;
+}
+
+.volume-slider {
+  width: 100%;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: 3px;
+  outline: none;
+  opacity: 0.9;
+  transition: opacity 0.2s;
+}
+
+.volume-slider:hover {
+  opacity: 1;
+}
+
+.volume-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+  border: 2px solid var(--card-color);
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+}
+
+.volume-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: white;
+  cursor: pointer;
+  border: 2px solid var(--card-color);
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+}
+
+.loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: white;
+  border-radius: 15px;
+}
+
+.loading-spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid transparent;
+  border-top-color: var(--card-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
   .sound-card {
-    padding: 16px;
+    padding: 15px;
     gap: 12px;
   }
   
-  .icon-wrapper {
-    width: 50px;
-    height: 50px;
+  .sound-icon {
+    width: 40px;
+    height: 40px;
     font-size: 1.5rem;
   }
   
-  .sound-card__title {
-    font-size: 1rem;
+  .sound-name {
+    font-size: 1.1rem;
+  }
+  
+  .play-button {
+    width: 50px;
+    height: 50px;
+    font-size: 1.3rem;
   }
 }
 </style>
