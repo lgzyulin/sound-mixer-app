@@ -6,42 +6,42 @@ const SOUND_CONFIG = [
     id: 'rain',
     name: '下雨声',
     icon: '🌧️',
-    file: '/sounds/rain.mp3',  // 确保文件路径正确
+    file: './sounds/rain.mp3',  // 确保文件路径正确
     color: '#4facfe'
   },
   {
     id: 'waves',
     name: '海浪声',
     icon: '🌊', 
-    file: '/sounds/waves.mp3',  // 确保文件路径正确
+    file: './sounds/waves.mp3',  // 确保文件路径正确
     color: '#a8edea'
   },
   {
     id: 'fireplace',
     name: '火炉声',
     icon: '🔥',
-    file: '/sounds/fireplace.mp3',  // 确保文件路径正确
+    file: './sounds/fireplace.mp3',  // 确保文件路径正确
     color: '#ff9a9e'
   },
   {
     id: 'forest',
     name: '森林声',
     icon: '🌲',
-    file: '/sounds/forest.mp3',  // 确保文件路径正确
+    file: './sounds/forest.mp3',  // 确保文件路径正确
     color: '#a3b18a'
   },
   {
     id: 'coffee',
     name: '咖啡厅',
     icon: '☕',
-    file: '/sounds/coffee.mp3',  // 确保文件路径正确
+    file: './sounds/coffee.mp3',  // 确保文件路径正确
     color: '#d4a574'
   },
   {
     id: 'keyboard',
     name: '键盘声',
     icon: '⌨️',
-    file: '/sounds/keyboard.mp3',  // 确保文件路径正确
+    file: './sounds/keyboard.mp3',  // 确保文件路径正确
     color: '#b9b4c7'
   }
 ]
