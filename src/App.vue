@@ -209,21 +209,32 @@ const updateTime = (clientX, clientY) => {
 
 // 初始化应用
 const initializeApp = async () => {
+  console.log('开始初始化应用...')
   try {
     await preloadSounds()
+    console.log('应用初始化完成')
   } catch (err) {
-    console.error('音频加载失败:', err)
+    console.error('应用初始化失败:', err)
+    // 即使音频加载失败，也继续显示界面
+    error.value = '音频加载失败，但应用可以正常使用'
   }
 }
 
 // 组件挂载
 onMounted(async () => {
-  await initializeApp()
+  console.log('App.vue 组件已挂载')
   
-  // 请求通知权限
-  if ('Notification' in window && Notification.permission === 'default') {
-    Notification.requestPermission()
-  }
+  // 延迟初始化，确保DOM完全渲染
+  setTimeout(async () => {
+    await initializeApp()
+    
+    // 请求通知权限
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().then(permission => {
+        console.log('通知权限:', permission)
+      })
+    }
+  }, 100)
   
   // 防止文本选择
   document.addEventListener('selectstart', preventSelect)
@@ -260,7 +271,14 @@ const preventSelect = (event) => {
         <p class="loading-subtext">已加载 {{ loadedSoundsCount }}/6 个音频</p>
       </div>
     </div>
-
+<div v-else class="sound-mixer">
+  <!-- 调试信息 -->
+  <div class="debug-info" v-if="false"> <!-- 设置为 false 隐藏，需要调试时改为 true -->
+    <p>应用状态: 运行中</p>
+    <p>音频数量: {{ sounds.length }}</p>
+    <p>播放状态: {{ isPlaying }}</p>
+    <p>计时器模式: {{ timerMode }}</p>
+  </div>
     <!-- 错误提示 -->
     <div v-else-if="error" class="error-container">
       <div class="error-content">
@@ -270,7 +288,7 @@ const preventSelect = (event) => {
         <button class="retry-btn" @click="initializeApp">🔄 重新加载</button>
       </div>
     </div>
-
+    
     <!-- 主界面 -->
     <div v-else class="sound-mixer">
       <header class="app-header">
@@ -492,6 +510,7 @@ const preventSelect = (event) => {
         <p class="footer-hint">提示：计时器运行时，音频会自动在计时结束时停止</p>
       </footer>
     </div>
+  </div>
   </div>
 </template>
 
