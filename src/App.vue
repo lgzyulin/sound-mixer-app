@@ -257,7 +257,7 @@ const preventSelect = (event) => {
           <div class="dot" style="--delay: 0.3s; --color: #764ba2"></div>
         </div>
         <p class="loading-text">正在加载音频...</p>
-        <p class="loading-subtext">已加载 {{ loadedSoundsCount }}/6 个音频</p>
+        <p class="loading-subtext">已加载 {{ loadedSoundsCount }}/9 个音频</p>
       </div>
     </div>
 
@@ -468,7 +468,7 @@ const preventSelect = (event) => {
           
           <!-- 音频信息 -->
           <div class="audio-info">
-            <span>已加载音频: {{ loadedSoundsCount }}/6</span>
+            <span>已加载音频: {{ loadedSoundsCount }}/9</span>
             <span v-if="timerMode === 'countdown'" class="timer-info">
               计时器: {{ isTimerRunning ? '运行中' : '已暂停' }} - {{ formattedTimeLeft }}
             </span>

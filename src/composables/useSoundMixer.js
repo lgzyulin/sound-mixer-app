@@ -43,7 +43,29 @@ const SOUND_CONFIG = [
     icon: '⌨️',
     file: './sounds/keyboard.mp3',  // 确保文件路径正确
     color: '#b9b4c7'
+  },
+  {
+    id: 'crickets',
+    name: '自然草丛',
+    icon: '🦗',
+    file: './sounds/crickets.mp3',  // 确保文件路径正确
+    color: '#106224ff'
+  },
+  {
+    id: 'city',
+    name: '城市印象',
+    icon: '🏢',
+    file: './sounds/city.mp3',  // 确保文件路径正确
+    color: '#81064aff'
+  },
+  {
+    id: 'singingbowl',
+    name: '钵音',
+    icon: '📿',
+    file: './sounds/singingbowl.mp3',  // 确保文件路径正确
+    color: '#b0d619ff'
   }
+  
 ]
 
 export function useSoundMixer() {
