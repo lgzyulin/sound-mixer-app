@@ -3,7 +3,7 @@ import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { useSoundMixer } from './composables/useSoundMixer'
 import { useTimer } from './composables/useTimer'
 import SoundCard from './components/SoundCard.vue'
-
+/*import backgroundImage from './images/background.jpg';*/
 // 初始化音频管理器
 const {
   sounds,
@@ -493,13 +493,17 @@ const preventSelect = (event) => {
       </footer>
     </div>
   </div>
+ 
 </template>
 
 <style scoped>
 .app {
   min-height: 100vh;
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-  color: white;
+ background: 
+    url('./images/background.jpg') no-repeat center center fixed,
+    linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  background-size: cover;
+  color: rgb(9, 1, 38);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
 }
 
@@ -509,7 +513,8 @@ const preventSelect = (event) => {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  /*background: url('./images/background.jpg') no-repeat center center fixed;*/
+  background-size: cover;
 }
 
 .loading-animation {
@@ -567,7 +572,8 @@ const preventSelect = (event) => {
   align-items: center;
   min-height: 100vh;
   padding: 20px;
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  /*background: url('./images/background.jpg') no-repeat center center fixed;*/
+  background-size: cover;
 }
 
 .error-content {
