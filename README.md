@@ -17,9 +17,9 @@
 
 
 ## 项目截图
-![截图1](https://imgloc.com/image/CE254p)
-![截图2](https://imgloc.com/image/CE26i6)
-![截图3](https://imgloc.com/image/CE2ebO)
+![截图1](https://i.imgs.ovh/2025/12/18/CE254p.png)
+![截图2](https://i.imgs.ovh/2025/12/18/CE26i6.jpeg)
+![截图3](https://i.imgs.ovh/2025/12/18/CE2ebO.jpeg)
 
 ## 技术栈
 
