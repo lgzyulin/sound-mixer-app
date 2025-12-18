@@ -17,9 +17,9 @@
 
 
 ## 项目截图
-![截图1](./pic/1.png)
-![截图2](./pic/2.jpg)
-![截图3](./pic/3.jpg)
+![截图1](https://imgloc.com/image/CE254p)
+![截图2](https://imgloc.com/image/CE26i6)
+![截图3](https://imgloc.com/image/CE2ebO)
 
 ## 技术栈
 
